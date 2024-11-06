@@ -66,8 +66,8 @@ Here are the parameters available at compile time:
 For instance, to build the project with LR1110MB1GJS shield simply run make as follows
 
 ```shell
-$ cd $SDK_FOLDER/lr11xx/apps/ranging_demo/makefile
-$ make RADIO_SHIELD=LR1110MB1GJS
+cd $SDK_FOLDER/lr11xx/apps/ranging_demo/makefile
+make RADIO_SHIELD=LR1110MB1GJS
 ```
 
 ##### Command line configuration
@@ -76,7 +76,7 @@ Additional configuration flags can be passed from command line to compiler with 
 This is dedicated to define macros that can be defined like the following:
 
 ```bash
-$ make EXTRAFLAGS='-D<MACRO>=<VALUE>'
+make EXTRAFLAGS='-D<MACRO>=<VALUE>'
 ```
 
 Where `<MACRO>` is the macro name to set and `<VALUE>` is the value to set for this macro.
@@ -104,7 +104,7 @@ On the NUCLEO-L476RG development board, the firmware prints debug information to
 For instance, using stty on Linux with a device available in `/dev/ttyACM0`:
 
 ```shell
-$ stty -echo raw speed 921600 < /dev/ttyACM0 && cat /dev/ttyACM0
+stty -echo raw speed 921600 < /dev/ttyACM0 && cat /dev/ttyACM0
 ```
 
 ## Supported toolchains
