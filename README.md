@@ -2,7 +2,7 @@
 
 ## Description
 
-The sample code is used to perform a sub-GHz or 2.4G band based on Round-Trip Time of Flight (ranging) measurement between two devices : a ranging manager and a ranging subordinate. 
+The sample code is used to perform a sub-GHz band for the LR1110 and both sub-GHz and 2.4GHz ISM bands for the LR1120 LoRa based Round-Trip Time of Flight (ranging) measurement between two devices : a RTToF manager and a RTToF subordinate.
 
 This sample runs in two phases: initialization with LoRa type and ranging process with RTToF type. At initialization phase, the manager and subordinate will exchange some information, such as number of frequency hopping, with the unique address by using LoRa mode. After successful initialization, they will do `RANGING_HOPPING_CHANNELS_MAX` times ranging process with a fixed frequency table for hopping by using RTToF mode. Then, the ranging results with JSON format will be printed on the manager terminal.
 
@@ -25,7 +25,7 @@ The example specific configuration file can be found in [lr11xx/apps/ranging_dem
 
 - Spreading factors from SF5 to SF10 are recommended values.
 
-- Bandwidth shall be chosen among `LR11XX_RADIO_LORA_BW_125`, `LR11XX_RADIO_LORA_BW_250` and `LR11XX_RADIO_LORA_BW_500` for both sub-GHz and 2.4G bands.
+- Bandwidth shall be chosen among `LR11XX_RADIO_LORA_BW_125`, `LR11XX_RADIO_LORA_BW_250` and `LR11XX_RADIO_LORA_BW_500` for sub-GHz band for the LR1110 and for both the sub-GHz and 2.4GHz ISM bands for the LR1120.
 
 - The preamble length, `LORA_PREAMBLE_LENGTH`, should be set as 12, because it is related to the timing of ranging process.
 
