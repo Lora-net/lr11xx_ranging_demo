@@ -1,10 +1,10 @@
 /**
- * @file      display_driver.h
+ * @file      app_software_timer.h
  *
- * @brief     Display driver
+ * @brief     Design software timer based on system tick
  *
  * The Clear BSD License
- * Copyright Semtech Corporation 2024. All rights reserved.
+ * Copyright Semtech Corporation 2025. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the disclaimer
@@ -32,8 +32,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DISPLAY_DRIVER_H
-#define DISPLAY_DRIVER_H
+#ifndef APP_SOFTWARE_TIMER_H
+#define APP_SOFTWARE_TIMER_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +45,7 @@ extern "C" {
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*
  * -----------------------------------------------------------------------------
@@ -56,23 +57,21 @@ extern "C" {
  * --- PUBLIC CONSTANTS --------------------------------------------------------
  */
 
-#define DISPLAY_WHITE 0xFFFF
-#define DISPLAY_BLACK 0x0000
-#define DISPLAY_BLUE 0x001F
-#define DISPLAY_RED 0xF800
-#define DISPLAY_MAGENTA 0xF81F
-#define DISPLAY_GREEN 0x07E0
-#define DISPLAY_YELLOW 0xFFE0
-#define DISPLAY_BROWN 0XBC40
-#define DISPLAY_GRAY 0X8430
-#define DISPLAY_ORANGE 0XFD20
-
-#define DISPLAY_BACKGROUND DISPLAY_BLACK
-
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC TYPES ------------------------------------------------------------
  */
+
+typedef void ( *app_soft_timer_callback )( void );
+
+typedef struct
+{
+    uint32_t                start_time;
+    uint32_t                duration;
+    bool                    is_running;
+    bool                    is_periodic;
+    app_soft_timer_callback callback;
+} app_soft_timer_t;
 
 /*
  * -----------------------------------------------------------------------------
@@ -80,37 +79,54 @@ extern "C" {
  */
 
 /*!
- * @brief Initialize the DM-TFT28-105 display
- *
- * @param [in] context Radio implementation parameters
+ * @brief Initiate the system tick.
  */
-void display_init( const void* context );
+void app_system_ticks_init( void );
 
 /*!
- * @brief  Display string with format and no fixed parameters
+ * @brief Initiate a software timer.
  *
- * @param [in] x Starting x coordinate
- * @param [in] y Starting y coordinate
- * @param [in] color String's color
- * @param [in] format The point to string's format
+ * @param [in]  timer The point to create a new software timer.
+ * @param [in]  callback Set a callback function for this timer.
  */
-void display_string_printf( uint16_t x, uint16_t y, uint16_t color, const char* format, ... );
+void app_soft_timer_init( app_soft_timer_t* timer, app_soft_timer_callback callback );
 
 /*!
- * @brief Fill the specified section on the display
+ * @brief Start a software timer.
  *
- * @param [in] x_start Starting x coordinate
- * @param [in] y_start Starting y coordinate
- * @param [in] x_end Ending x coordinate
- * @param [in] y_end Ending y coordinate
- * @param [in] color Fill the color of the section
+ * @param [in]  timer The point to set a new software timer.
+ * @param [in]  duration_ms The duration in ms of the timer.
+ * @param [in]  is_periodic Whether this timer is a periodic or single one. true: periodic; flase: single.
  */
-void display_section_fill( uint16_t x_start, uint16_t y_start, uint16_t x_end, uint16_t y_end, uint16_t color );
+void app_soft_timer_start( app_soft_timer_t* timer, uint32_t duration_ms, bool is_periodic );
+
+/*!
+ * @brief Stop a software timer.
+ *
+ * @param [in]  timer The point to a software timer.
+ */
+void app_soft_timer_stop( app_soft_timer_t* timer );
+
+/*!
+ * @brief Check if the timer is expired.
+ *
+ * @param [in]  timer The point to a software timer.
+ *
+ * @return true: expired; false: not expired.
+ */
+bool app_soft_timer_is_expired( app_soft_timer_t* timer );
+
+/*!
+ * @brief Get the system tick timestamp.
+ *
+ * @return The current the tick timestamp. Uint: ms.
+ */
+uint32_t app_system_tick_get_ms( void );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // DISPLAY_DRIVER_H
+#endif  // APP_SOFTWARE_TIMER_H
 
 /* --- EOF ------------------------------------------------------------------ */

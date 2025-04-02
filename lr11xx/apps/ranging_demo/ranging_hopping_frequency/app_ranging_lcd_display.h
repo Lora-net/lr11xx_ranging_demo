@@ -74,6 +74,11 @@ extern "C" {
  */
 void lcd_display_results( ranging_global_result_t* result );
 
+/*!
+ * @brief Check the button status and change the texts on the LCD.
+ */
+void lcd_button_check( void );
+
 #ifdef __cplusplus
 }
 #endif

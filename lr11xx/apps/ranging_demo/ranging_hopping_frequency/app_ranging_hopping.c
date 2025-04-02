@@ -41,14 +41,12 @@
 #include "main_ranging_demo.h"
 #include "app_ranging_hopping.h"
 #include "apps_common.h"
-#include "app_ranging_timer.h"
 #include "lr11xx_radio.h"
 #include "lr11xx_regmem.h"
 #include "lr11xx_rttof.h"
 #include "smtc_hal_dbg_trace.h"
-#include "smtc_hal_mcu_timer.h"
-#include "smtc_hal_mcu_timer_stm32l4.h"
 #include "smtc_shield_lr11xx.h"
+#include "app_software_timer.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -60,24 +58,9 @@
 #define RANGING_ADDR_1 0x32101222
 
 /*!
- * @brief Total symbol numbers of a ranging process
+ * @brief Make a delay from the end of this single ranging to the next channel.
  */
-#define RANGING_ALL_SYMBOL 64.25
-#define RANGING_DONE_PROCESSING_TIME 5  // ms
-
-/*!
- * @brief Ranging related IRQs enabled on the Ranging manager device
- */
-#define RANGING_MANAGER_IRQ_MASK ( LR11XX_SYSTEM_IRQ_RTTOF_EXCH_VALID | LR11XX_SYSTEM_IRQ_RTTOF_TIMEOUT )
-
-/*!
- * @brief Ranging IRQs enabled on the Ranging subordinate device
- */
-#define RANGING_SUBORDINATE_IRQ_MASK ( LR11XX_SYSTEM_IRQ_RTTOF_REQ_DISCARDED | LR11XX_SYSTEM_IRQ_RTTOF_RESP_DONE )
-
-#define LORA_IRQ_MASK                                                                          \
-    ( LR11XX_SYSTEM_IRQ_TX_DONE | LR11XX_SYSTEM_IRQ_RX_DONE | LR11XX_SYSTEM_IRQ_HEADER_ERROR | \
-      LR11XX_SYSTEM_IRQ_TIMEOUT | LR11XX_SYSTEM_IRQ_CRC_ERROR )
+#define RANGING_DONE_PROCESSING_TIME 5  // uint: ms
 
 /*!
  * @brief Number of ranging address bytes the subordinate has to check upon reception of a ranging request
@@ -95,6 +78,16 @@
 #ifndef RANGING_RESPONSE_SYMBOLS_COUNT
 #define RANGING_RESPONSE_SYMBOLS_COUNT UINT8_C( 15 )
 #endif
+
+/*!
+ * @brief Total symbol numbers of a ranging process.
+ *
+ * @remarks Frequency sync: 4.25 symbols (6.25 symbols for SF5 or SF6). Fixed.
+ * @remarks Double header: 16 symbols. Fixed.
+ * @remarks Ranging request: 15 symbols. Fixed.
+ * @remarks Ranging silence: 2 symbols. Fixed.
+ */
+#define RANGING_ALL_SYMBOL ( LORA_PREAMBLE_LENGTH + 4.25 + 16 + 15 + 2 + RANGING_RESPONSE_SYMBOLS_COUNT )
 
 /*
  * -----------------------------------------------------------------------------
@@ -162,11 +155,6 @@ typedef struct ranging_result_s
  */
 static bool ranging_running_flag = false;
 
-/*!
- * @brief Set up a tmer for global ranging exchanging process
- */
-static bool ranging_exch_timer_launch = false;
-
 static lr11xx_radio_mod_params_lora_t mod_params;
 static lr11xx_radio_pkt_params_lora_t pkt_params;
 
@@ -182,14 +170,6 @@ static uint8_t radio_pl_buffer[PAYLOAD_LENGTH];
  * @brief Flag holding the current internal state of the ranging application
  */
 static uint8_t ranging_internal_state;
-static uint8_t ranging_next_start = false;
-
-/*!
- * @brief Set up a mcu timer by using LPTIM1
- */
-struct smtc_hal_mcu_timer_cfg_s ranging_mcu_timer_cfg;
-smtc_hal_mcu_timer_cfg_app_t    ranging_mcu_timer_callback;
-smtc_hal_mcu_timer_inst_t       ranging_mcu_timer_inst = { 0 };
 
 /*!
  * @brief Current channel that is used for ranging
@@ -197,25 +177,39 @@ smtc_hal_mcu_timer_inst_t       ranging_mcu_timer_inst = { 0 };
 static uint8_t current_channel;
 
 /*!
- * @brief Count RANGING_HOPPING_CHANNELS_MAX that have been used
+ * @brief Record the start time point that a single ranging starts.
  */
-static uint16_t measured_channels;
+static uint32_t single_ranging_start_ms;
 
-static uint32_t ranging_tx_start_ms;
-static uint32_t ranging_tx_count_ms;
+/*!
+ * @brief Calculate the elapsed time from start to timeout.
+ */
+static uint32_t single_ranging_elapsed_ms;
 
-static uint32_t             app_timer_tick_timeout_ms = 0;
 static app_running_status_t demo_status;
+
+/*!
+ * @brief Create a timer which is used for switching the next channel while ranging.
+ */
+static app_soft_timer_t ranging_next_channel_timer;
+
+/*!
+ * @brief Create a timer which is used for exiting the ranging process
+ *        in avoid of stopping the ranging loop.
+ */
+static app_soft_timer_t ranging_global_timer;
+
+/*!
+ * @brief Create a timer which is used for RX timeout on the RTToF type at subordinate side.
+ * @brief There is no "LR11XX_SYSTEM_IRQ_RTTOF_TIMEOUT" interrupt at subordinate side. So,
+ *        create a timer instead of it.
+ */
+static app_soft_timer_t sub_ranging_rx_timeout_timer;
 
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
  */
-
-/*!
- * @brief Callback of mcu timer
- */
-static void ranging_send_next_packet( void );
 
 /*!
  * @brief Read out and process a single ranging result from the ranging manager.
@@ -249,8 +243,11 @@ static float get_single_symbol_time_ms( lr11xx_radio_lora_bw_t bw, lr11xx_radio_
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
  */
 
-void app_radio_ranging_params_init( void )
+void app_radio_ranging_params_init( const void* context )
 {
+    float ranging_pa_ramp_time_ms;
+    float ranging_all_symbols;
+
     ranging_settings.frequency = RF_FREQ_IN_HZ;  // Set frequency for LoRa mode on the initialization process
     ranging_settings.tx_power  = TX_OUTPUT_POWER_DBM;
     ranging_settings.sf        = LORA_SPREADING_FACTOR;  // just be used for output in the logs
@@ -269,17 +266,49 @@ void app_radio_ranging_params_init( void )
     mod_params.cr   = LORA_CODING_RATE;
     mod_params.ldro = apps_common_compute_lora_ldro( LORA_SPREADING_FACTOR, LORA_BANDWIDTH );
 
+    apps_common_lr11xx_radio_ranging_init( context, ranging_settings.frequency, ranging_settings.tx_power );
+
+    if( ( PA_RAMP_TIME >= LR11XX_RADIO_RAMP_240_US ) && ( PA_RAMP_TIME <= LR11XX_RADIO_RAMP_304_US ) )
+    {
+        ranging_pa_ramp_time_ms = ( float ) ( 240 + ( PA_RAMP_TIME - LR11XX_RADIO_RAMP_240_US ) * 32 ) / 1000.0;
+    }
+    else
+    {
+        ranging_pa_ramp_time_ms = ( float ) ( PA_RAMP_TIME + 1 ) * 16 / 1000.0;
+    }
+
+    if( ( LORA_SPREADING_FACTOR == LR11XX_RADIO_LORA_SF5 ) || ( LORA_SPREADING_FACTOR == LR11XX_RADIO_LORA_SF6 ) )
+    {
+        /* There is two more symbols in the preamble while using the SF5 or SF6. */
+        ranging_all_symbols = RANGING_ALL_SYMBOL + 2;
+    }
+    else
+    {
+        ranging_all_symbols = RANGING_ALL_SYMBOL;
+    }
+
+    /* Plus 1ms. The purpose is to only use large values when converting float to an integer. */
+    ranging_settings.rng_req_delay =
+        ( uint16_t )( ( get_single_symbol_time_ms( mod_params.bw, mod_params.sf ) * ranging_all_symbols ) +
+                      ranging_pa_ramp_time_ms ) +
+        RANGING_DONE_PROCESSING_TIME + 1;
+
+    /* Calculate the time for the global ranging timer.
+     * Plus 1 because at the first start, it delays one ranging period.
+     * Plus 'ranging_settings.rng_req_count * 1' because the radio changes mode between standby and RX/TX.
+     * Give a margin of 5 milliseconds.
+     */
+    ranging_settings.rng_exch_timeout = ranging_settings.rng_req_delay * ( ranging_settings.rng_req_count + 1 ) +
+                                        ( ranging_settings.rng_req_count * 1 ) + 5;
+
     memset( &radio_pl_buffer, 0x00u, sizeof( radio_pl_buffer ) );
 
-    ranging_results.cnt_packet_rx_ok = 0u;
+    /* Initialize system tick clock */
+    app_system_ticks_init( );
 
-    /* Initialize MCU timer  */
-    ranging_mcu_timer_cfg.tim              = ( LPTIM_TypeDef* ) LPTIM1;
-    ranging_mcu_timer_callback.expiry_func = ( void* ) ranging_send_next_packet;
-    smtc_hal_mcu_timer_init( &ranging_mcu_timer_cfg, &ranging_mcu_timer_callback, &ranging_mcu_timer_inst );
-
-    /* Initialize system tick handler */
-    app_timer_tick_init( );
+    app_soft_timer_init( &ranging_next_channel_timer, NULL );
+    app_soft_timer_init( &ranging_global_timer, NULL );
+    app_soft_timer_init( &sub_ranging_rx_timeout_timer, NULL );
 
     ranging_running_flag = false;
 }
@@ -289,34 +318,23 @@ void app_radio_ranging_setup( const void* context )
     demo_status = APP_STATUS_RUNNING;
     if( ranging_running_flag == false )
     {
-        ranging_running_flag        = true;
-        ranging_exch_timer_launch   = false;
-        ranging_settings.rng_status = RANGING_STATUS_INIT;
-
-        apps_common_lr11xx_radio_ranging_init( context, ranging_settings.frequency, ranging_settings.tx_power );
-
-        ranging_settings.rng_req_delay =
-            ( uint16_t )( get_single_symbol_time_ms( mod_params.bw, mod_params.sf ) * RANGING_ALL_SYMBOL ) +
-            RANGING_DONE_PROCESSING_TIME;
-
+        ranging_running_flag         = true;
+        ranging_settings.rng_status  = RANGING_STATUS_INIT;
         ranging_results.rng_distance = 0.0;
         ranging_internal_state       = APP_RADIO_RANGING_CONFIG;
     }
 
-    /* Global ranging exchange timeout */
-    if( ranging_exch_timer_launch == true )
+    /* Check whether the global timer has expired. */
+    if( app_soft_timer_is_expired( &ranging_global_timer ) == true )
     {
-        if( app_timer_tick_has_expired( &app_timer_tick_timeout_ms ) == true )
-        {
-            ranging_exch_timer_launch = false;
-            ranging_running_flag      = false;
-            demo_status               = APP_STATUS_ERROR;
-            smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );
-            ranging_internal_state = APP_RADIO_RANGING_CONFIG;
-            lr11xx_system_set_standby( context, LR11XX_SYSTEM_STANDBY_CFG_RC );
-            ranging_settings.rng_status = RANGING_STATUS_TIMEOUT;
-            HAL_PERF_TEST_TRACE_PRINTF( "ERROR: Global Ranging Timeout\r\n" );
-        }
+        ranging_running_flag = false;
+        demo_status          = APP_STATUS_ERROR;
+        app_soft_timer_stop( &ranging_next_channel_timer );
+        app_soft_timer_stop( &sub_ranging_rx_timeout_timer );
+        ranging_internal_state = APP_RADIO_RANGING_CONFIG;
+        lr11xx_system_set_standby( context, LR11XX_SYSTEM_STANDBY_CFG_XOSC );
+        ranging_settings.rng_status = RANGING_STATUS_TIMEOUT;
+        HAL_PERF_TEST_TRACE_PRINTF( "ERROR: Global Ranging Timeout\r\n" );
     }
 }
 
@@ -325,6 +343,7 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
     switch( ranging_internal_state )
     {
     case APP_RADIO_RANGING_CONFIG:
+    {
         ranging_settings.rng_status  = RANGING_STATUS_INIT;
         ranging_settings.packet_type = LR11XX_RADIO_PKT_TYPE_LORA;
         pkt_params.pld_len_in_bytes  = PAYLOAD_LENGTH;
@@ -340,18 +359,16 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
 
         if( is_manager )  // manager
         {
-            ranging_results.cnt_packet_rx_ok = 0;
-            measured_channels                = 0u;
-            current_channel                  = 0u;
-            radio_pl_buffer[0]               = ( ranging_settings.rng_address >> 24u ) & 0xFFu;
-            radio_pl_buffer[1]               = ( ranging_settings.rng_address >> 16u ) & 0xFFu;
-            radio_pl_buffer[2]               = ( ranging_settings.rng_address >> 8u ) & 0xFFu;
-            radio_pl_buffer[3]               = ( ranging_settings.rng_address & 0xFFu );
-            radio_pl_buffer[4]               = current_channel;                 // set the first channel to use
-            radio_pl_buffer[5]               = ranging_settings.rng_req_count;  // set the number of frequency hopping
-            radio_pl_buffer[6]               = 0;
+            ranging_results.cnt_packet_rx_ok_manager = 0;
+            current_channel                          = 0u;
+            radio_pl_buffer[0]                       = ( ranging_settings.rng_address >> 24u ) & 0xFFu;
+            radio_pl_buffer[1]                       = ( ranging_settings.rng_address >> 16u ) & 0xFFu;
+            radio_pl_buffer[2]                       = ( ranging_settings.rng_address >> 8u ) & 0xFFu;
+            radio_pl_buffer[3]                       = ( ranging_settings.rng_address & 0xFFu );
+            radio_pl_buffer[4]                       = current_channel;  // set the first channel to use
+            radio_pl_buffer[5]                       = 0;
 
-            // send lora packet
+            // send LoRa packet
             lr11xx_regmem_write_buffer8( context, radio_pl_buffer, PAYLOAD_LENGTH );
             lr11xx_radio_set_tx( context, 0 );
         }
@@ -362,23 +379,17 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
 
         ranging_internal_state = APP_RADIO_IDLE;
         break;
-
+    }
     case APP_RADIO_RANGING_START:
-        if( ranging_next_start == true )
+    {
+        if( app_soft_timer_is_expired( &ranging_next_channel_timer ) == true )
         {
-            ranging_next_start = false;
-            smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );  // stop the autoreload timer
-            measured_channels++;
-            if( measured_channels <= ranging_settings.rng_req_count )
+            if( current_channel < RANGING_HOPPING_CHANNELS_MAX )
             {
                 lr11xx_radio_set_rf_freq( context, ranging_hopping_channels_array[current_channel] );
                 current_channel++;
-                if( current_channel >= RANGING_HOPPING_CHANNELS_MAX )
-                {
-                    current_channel -= RANGING_HOPPING_CHANNELS_MAX;
-                }
-                ranging_internal_state = APP_RADIO_IDLE;
-                ranging_tx_start_ms = app_timer_tick_get_ms( );
+                ranging_internal_state  = APP_RADIO_IDLE;
+                single_ranging_start_ms = app_system_tick_get_ms( );
                 apps_common_lr11xx_ranging_toggle_tx_rx_leds( );
 
                 if( is_manager )  // manager
@@ -387,29 +398,31 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
                 }
                 else  // subordinate
                 {
-                    lr11xx_radio_set_rx( context,
-                                         ranging_settings.rng_req_delay - ( RANGING_DONE_PROCESSING_TIME / 2 ) );
+                    lr11xx_radio_set_rx( context, 0 );
+                    app_soft_timer_start( &sub_ranging_rx_timeout_timer,
+                                          ranging_settings.rng_req_delay -
+                                              ( uint16_t )( get_single_symbol_time_ms( mod_params.bw, mod_params.sf ) *
+                                                            RANGING_RESPONSE_SYMBOLS_COUNT ) -
+                                              RANGING_DONE_PROCESSING_TIME / 2,
+                                          false );
                 }
             }
             else
             {
-                smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );  // stop the autoreload timer
-                demo_status            = APP_STATUS_TERMINATED;
-                ranging_running_flag   = false;
-                ranging_internal_state = APP_RADIO_RANGING_CONFIG;
-                lr11xx_system_set_standby( context, LR11XX_SYSTEM_STANDBY_CFG_RC );
+                app_soft_timer_stop( &ranging_global_timer );
+                demo_status                 = APP_STATUS_TERMINATED;
+                ranging_running_flag        = false;
+                ranging_internal_state      = APP_RADIO_RANGING_CONFIG;
                 ranging_settings.rng_status = RANGING_STATUS_VALID;
             }
         }
         break;
-
+    }
     case APP_RADIO_RANGING_DONE:
-        smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );
-
+    {
         if( is_manager )  // manager
         {
-            smtc_hal_mcu_timer_start( ranging_mcu_timer_inst, RANGING_DONE_PROCESSING_TIME );
-
+            app_soft_timer_start( &ranging_next_channel_timer, RANGING_DONE_PROCESSING_TIME, false );
             // get ranging result
             ranging_result_t result = { 0 };
             get_ranging_result( context, mod_params.bw, &result );
@@ -417,54 +430,59 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
             ranging_results.raw_rssi[ranging_results.rng_result_index]             = result.rssi;
             ranging_results.raw_rng_results[ranging_results.rng_result_index]      = result.raw_distance;
             ranging_results.distance_rng_results[ranging_results.rng_result_index] = result.distance_m;
-            if( current_channel == 0 )
-            {
-                // save the last result's index
-                ranging_results.rng_freq_index[ranging_results.rng_result_index] = RANGING_HOPPING_CHANNELS_MAX;
-            }
-            else
+
+            if( current_channel <= RANGING_HOPPING_CHANNELS_MAX )
             {
                 ranging_results.rng_freq_index[ranging_results.rng_result_index] = current_channel;
             }
 
             ranging_results.rng_result_index++;
+            ranging_results.cnt_packet_rx_ok_manager++;
         }
         else  // subordinate
         {
-            // next ranging in RANGING_DONE_PROCESSING_TIME - 1 ms in order to start before the manager
-            smtc_hal_mcu_timer_start( ranging_mcu_timer_inst, RANGING_DONE_PROCESSING_TIME - 1 );
+            app_soft_timer_start( &ranging_next_channel_timer, RANGING_DONE_PROCESSING_TIME - 1, false );
         }
 
-        ranging_results.cnt_packet_rx_ok++;
         ranging_internal_state = APP_RADIO_RANGING_START;
         break;
-
+    }
     case APP_RADIO_RANGING_TIMEOUT:
-        ranging_tx_count_ms = app_timer_tick_get_ms( ) - ranging_tx_start_ms;
-        if( ranging_tx_count_ms < ranging_settings.rng_req_delay )
+    {
+        app_soft_timer_stop( &sub_ranging_rx_timeout_timer );
+        lr11xx_system_set_standby( context, LR11XX_SYSTEM_STANDBY_CFG_XOSC );
+        single_ranging_elapsed_ms = app_system_tick_get_ms( ) - single_ranging_start_ms;
+
+        uint32_t timing_next_channel_time;
+        if( single_ranging_elapsed_ms < ranging_settings.rng_req_delay )
         {
-            smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );
-            smtc_hal_mcu_timer_start( ranging_mcu_timer_inst, ranging_settings.rng_req_delay - ranging_tx_count_ms );
+            timing_next_channel_time = ranging_settings.rng_req_delay - single_ranging_elapsed_ms;
         }
         else
         {
-            smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );
+            timing_next_channel_time = RANGING_DONE_PROCESSING_TIME;
+        }
 
-            if( is_manager )  // manager
-            {
-                smtc_hal_mcu_timer_start( ranging_mcu_timer_inst, RANGING_DONE_PROCESSING_TIME );
-            }
-            else  // subordinate
-            {
-                // next ranging in RANGING_DONE_PROCESSING_TIME - 1 ms in order to start before the manager
-                smtc_hal_mcu_timer_start( ranging_mcu_timer_inst, RANGING_DONE_PROCESSING_TIME - 1 );
-            }
+        if( is_manager )  // manager
+        {
+            app_soft_timer_start( &ranging_next_channel_timer, timing_next_channel_time, false );
+        }
+        else
+        {
+            app_soft_timer_start( &ranging_next_channel_timer, timing_next_channel_time - 1, false );
         }
         ranging_internal_state = APP_RADIO_RANGING_START;
         break;
-
+    }
+    case APP_RADIO_RANGING_REQ_VALID:
+    {
+        app_soft_timer_stop( &sub_ranging_rx_timeout_timer );
+        ranging_internal_state = APP_RADIO_IDLE;
+        break;
+    }
     case APP_RADIO_RX:
-        lr11xx_system_set_standby( context, LR11XX_SYSTEM_STANDBY_CFG_RC );
+    {
+        lr11xx_system_set_standby( context, LR11XX_SYSTEM_STANDBY_CFG_XOSC );
         if( ranging_settings.rng_status == RANGING_STATUS_INIT )
         {
             lr11xx_radio_rx_buffer_status_t rx_buffer_status;
@@ -486,8 +504,8 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
 
                 if( is_manager )  // manager
                 {
-                    ranging_settings.rng_status      = RANGING_STATUS_PROCESS;
-                    ranging_results.slave_rssi_value = ( int8_t ) radio_pl_buffer[6];
+                    ranging_settings.rng_status            = RANGING_STATUS_PROCESS;
+                    ranging_results.subordinate_rssi_value = ( int8_t ) radio_pl_buffer[5];
 
                     ranging_settings.packet_type = LR11XX_RADIO_PKT_TYPE_RTTOF;
                     pkt_params.pld_len_in_bytes  = 10u;
@@ -513,26 +531,18 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
                     lr11xx_system_set_dio_irq_params( context, RANGING_MANAGER_IRQ_MASK, 0 );
                     lr11xx_system_clear_irq_status( context, LR11XX_SYSTEM_IRQ_ALL_MASK );
 
-                    measured_channels                = 0;
                     ranging_results.rng_result_index = 0;
                     ranging_internal_state           = APP_RADIO_RANGING_START;
 
-                    // Launch global ranging timer
-                    // Add 1, due to the 'ranging_mcu_timer_inst' timer
-                    // +1000ms, more than real using time
-                    ranging_settings.rng_exch_timeout =
-                        ranging_settings.rng_req_delay * ( ranging_settings.rng_req_count + 1 ) + 1000;
-                    app_timer_tick_set_ms( &app_timer_tick_timeout_ms, ranging_settings.rng_exch_timeout );
-                    ranging_exch_timer_launch = true;
-                    // Schedule next ranging
-                    smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );
-                    smtc_hal_mcu_timer_start( ranging_mcu_timer_inst, ranging_settings.rng_req_delay );
+                    /* Start a global timer for the whole ranging process. */
+                    app_soft_timer_start( &ranging_global_timer, ranging_settings.rng_exch_timeout, false );
+                    /* Schedule the first ranging on the first channel. */
+                    app_soft_timer_start( &ranging_next_channel_timer, ranging_settings.rng_req_delay, false );
                 }
                 else  // subordinate
                 {
-                    current_channel                = radio_pl_buffer[4];
-                    ranging_settings.rng_req_count = radio_pl_buffer[5];
-                    radio_pl_buffer[6]             = ( uint8_t ) ranging_results.rssi_value;
+                    current_channel    = radio_pl_buffer[4];
+                    radio_pl_buffer[5] = ( uint8_t ) ranging_results.rssi_value;
 
                     lr11xx_regmem_write_buffer8( context, radio_pl_buffer, PAYLOAD_LENGTH );
                     lr11xx_radio_set_tx( context, 0 );
@@ -549,8 +559,9 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
             ranging_internal_state = APP_RADIO_RANGING_CONFIG;
         }
         break;
-
+    }
     case APP_RADIO_TX:
+    {
         if( ranging_settings.rng_status == RANGING_STATUS_INIT )
         {
             if( is_manager )  // manager
@@ -588,21 +599,12 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
                 lr11xx_system_set_dio_irq_params( context, RANGING_SUBORDINATE_IRQ_MASK, 0 );
                 lr11xx_system_clear_irq_status( context, LR11XX_SYSTEM_IRQ_ALL_MASK );
 
-                ranging_results.cnt_packet_rx_ok       = 0;
-                measured_channels                      = 0;
-                ranging_results.cnt_packet_rx_ko_slave = 0;
-
-                // Launch global ranging timer
-                // Add 1, due to the 'ranging_mcu_timer_inst' timer
-                // +1000ms, more than real using time
-                ranging_settings.rng_exch_timeout =
-                    ranging_settings.rng_req_delay * ( ranging_settings.rng_req_count + 1 ) + 1000;
-                app_timer_tick_set_ms( &app_timer_tick_timeout_ms, ranging_settings.rng_exch_timeout );
-                ranging_exch_timer_launch = true;
-                // Schedule next ranging
-                smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );
-                smtc_hal_mcu_timer_start( ranging_mcu_timer_inst, ranging_settings.rng_req_delay );
                 ranging_internal_state = APP_RADIO_RANGING_START;
+
+                /* Start a global timer for the whole ranging process. */
+                app_soft_timer_start( &ranging_global_timer, ranging_settings.rng_exch_timeout, false );
+                /* Schedule the first ranging on the first channel. */
+                app_soft_timer_start( &ranging_next_channel_timer, ranging_settings.rng_req_delay - 1, false );
             }
         }
         else
@@ -610,51 +612,28 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
             ranging_internal_state = APP_RADIO_RANGING_CONFIG;
         }
         break;
-
+    }
     case APP_RADIO_TIMEOUT:
+    {
         ranging_settings.rng_status = RANGING_STATUS_TIMEOUT;
         ranging_internal_state      = APP_RADIO_RANGING_CONFIG;
         break;
-
+    }
     case APP_RADIO_ERROR:
+    {
         ranging_internal_state = APP_RADIO_RANGING_CONFIG;
         break;
-
-    case APP_RADIO_TX_TIMEOUT:
-        if( ranging_settings.rng_status != RANGING_STATUS_PROCESS )
-        {
-            ranging_internal_state = APP_RADIO_RANGING_CONFIG;
-        }
-        else
-        {
-            ranging_internal_state = APP_RADIO_RANGING_START;
-        }
-        break;
-
+    }
     case APP_RADIO_IDLE:
-        if( is_manager )  // manager
+    {
+        /* Check whether the radio has timed out on the RTToF type at subordinate side. */
+        if( ( app_soft_timer_is_expired( &sub_ranging_rx_timeout_timer ) == true ) && ( !is_manager ) )
         {
-            if( ( ranging_settings.rng_status == RANGING_STATUS_PROCESS ) && ( ranging_next_start == true ) )
-            {
-                ranging_results.cnt_packet_rx_ko_slave++;
-                ranging_internal_state = APP_RADIO_RANGING_START;
-            }
-        }
-        else  // subordinate
-        {
-            if( ranging_results.cnt_packet_rx_ko_slave > RANGING_HOPPING_CHANNELS_MAX )
-            {
-                ranging_results.cnt_packet_rx_ko_slave = 0;
-                ranging_internal_state                 = APP_RADIO_RANGING_CONFIG;
-
-                smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );
-            }
+            ranging_internal_state = APP_RADIO_RANGING_TIMEOUT;
         }
         break;
-
+    }
     default:
-        ranging_internal_state = APP_RADIO_RANGING_CONFIG;
-        smtc_hal_mcu_timer_stop( ranging_mcu_timer_inst );
         break;
     }
     return demo_status;
@@ -662,9 +641,9 @@ app_running_status_t app_radio_ranging_run( const void* context, const bool is_m
 
 ranging_global_result_t* app_ranging_get_result( void )
 {
-    ranging_results.rng_per =
-        100 - ( ( uint8_t )( ( ( float ) ranging_results.cnt_packet_rx_ok / ( float ) ranging_settings.rng_req_count ) *
-                             100 ) );
+    ranging_results.rng_per = 100 - ( ( uint8_t )( ( ( float ) ranging_results.cnt_packet_rx_ok_manager /
+                                                     ( float ) ranging_settings.rng_req_count ) *
+                                                   100.0 ) );
     ranging_handle_distance_result( );
     return &ranging_results;
 }
@@ -676,15 +655,13 @@ ranging_params_settings_t* app_ranging_get_radio_settings( void )
 
 void app_ranging_params_reset( void )
 {
-    ranging_internal_state                 = APP_RADIO_IDLE;
-    demo_status                            = APP_STATUS_NOT_CONFIGURED;
-    ranging_results.cnt_packet_rx_ko_slave = 0;
-    ranging_results.cnt_packet_rx_ok       = 0u;
-    ranging_results.rng_distance           = 0;
-    ranging_results.rssi_value             = 0;
-    ranging_running_flag                   = false;
-    measured_channels                      = 0;
-    current_channel                        = 0;
+    ranging_internal_state                   = APP_RADIO_IDLE;
+    demo_status                              = APP_STATUS_NOT_CONFIGURED;
+    ranging_results.cnt_packet_rx_ok_manager = 0u;
+    ranging_results.rng_distance             = 0;
+    ranging_results.rssi_value               = 0;
+    ranging_running_flag                     = false;
+    current_channel                          = 0;
 }
 
 uint32_t get_ranging_hopping_channels( uint8_t index )
@@ -701,19 +678,19 @@ void set_ranging_process_state( uint8_t state )
     ranging_internal_state = state;
 }
 
+bool ranging_process_is_running( void )
+{
+    if( ranging_settings.rng_status == RANGING_STATUS_PROCESS )
+    {
+        return true;
+    }
+    return false;
+}
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTION DEFINITIONS --------------------------------------------
  */
-
-static void ranging_send_next_packet( void )
-{
-    ranging_next_start = true;
-    if( ranging_settings.rng_status == RANGING_STATUS_PROCESS )
-    {
-        ranging_results.cnt_packet_rx_ko_slave++;
-    }
-}
 
 static lr11xx_status_t get_ranging_result( const void* context, lr11xx_radio_lora_bw_t ranging_bw,
                                            ranging_result_t* result )
@@ -746,11 +723,13 @@ static void ranging_handle_distance_result( void )
 {
     float   median;
     int32_t sort_distance_rng_results[RANGING_HOPPING_CHANNELS_MAX];
+    uint8_t sort_distance_rng_index[RANGING_HOPPING_CHANNELS_MAX];
 
     // copy the distance results
     for( uint16_t k = 0; k < ranging_results.rng_result_index; k++ )
     {
         sort_distance_rng_results[k] = ranging_results.distance_rng_results[k];
+        sort_distance_rng_index[k]   = k;
     }
 
     if( ranging_results.rng_result_index > 0 )
@@ -765,6 +744,10 @@ static void ranging_handle_distance_result( void )
                     int32_t temp                     = sort_distance_rng_results[j];
                     sort_distance_rng_results[j]     = sort_distance_rng_results[j + 1];
                     sort_distance_rng_results[j + 1] = temp;
+
+                    uint8_t temp_index             = sort_distance_rng_index[j];
+                    sort_distance_rng_index[j]     = sort_distance_rng_index[j + 1];
+                    sort_distance_rng_index[j + 1] = temp_index;
                 }
             }
         }
@@ -790,7 +773,8 @@ static void ranging_handle_distance_result( void )
             ranging_settings.rng_status = RANGING_STATUS_VALID;
         }
 
-        ranging_results.rng_distance = median;
+        ranging_results.rng_distance       = median;
+        ranging_results.rng_distance_index = sort_distance_rng_index[ranging_results.rng_result_index / 2];
     }
 }
 

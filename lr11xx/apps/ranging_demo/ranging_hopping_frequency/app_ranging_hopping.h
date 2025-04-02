@@ -86,7 +86,7 @@ enum ranging_running_status
 };
 
 /*!
- * @brief List of states for radio
+ * @brief List of statuses for radio
  */
 enum app_radio_internal_states
 {
@@ -95,11 +95,11 @@ enum app_radio_internal_states
     APP_RADIO_RANGING_TIMEOUT,
     APP_RADIO_RANGING_CONFIG,
     APP_RADIO_RANGING_START,
-    APP_RADIO_RX,          // Rx done
-    APP_RADIO_TIMEOUT,     // Rx timeout
-    APP_RADIO_ERROR,       // Rx error
-    APP_RADIO_TX,          // Tx done
-    APP_RADIO_TX_TIMEOUT,  // Tx error
+    APP_RADIO_RANGING_REQ_VALID,
+    APP_RADIO_RX,       // RX done
+    APP_RADIO_TIMEOUT,  // RX timeout
+    APP_RADIO_ERROR,    // RX error
+    APP_RADIO_TX,       // TX done
 };
 
 /*
@@ -127,18 +127,19 @@ typedef struct
 
 typedef struct
 {
-    uint16_t cnt_packet_rx_ok;        // Rx packet received OK
-    uint16_t cnt_packet_rx_ko_slave;  // Rx packet received KO (slave side)
-    int      rng_result_index;
-    uint8_t  rng_freq_index[RANGING_HOPPING_CHANNELS_MAX];
-    int32_t  distance_rng_results[RANGING_HOPPING_CHANNELS_MAX];
-    uint32_t raw_rng_results[RANGING_HOPPING_CHANNELS_MAX];
-    int8_t   raw_rssi[RANGING_HOPPING_CHANNELS_MAX];
-    uint8_t  rng_per;           // Ranging PER
-    float    rng_distance;      // Distance measured by ranging
-    int8_t   rssi_value;        // RSSI Value
-    int8_t   slave_rssi_value;  // Slave Rssi Value
-    int8_t   snr_value;         // SNR Value (only for LORA mode type)
+    uint16_t cnt_packet_rx_ok_manager;                            // RX packet received OK (manager side)
+    int      rng_result_index;                                    // Manager side
+    uint8_t  rng_freq_index[RANGING_HOPPING_CHANNELS_MAX];        // Manager side
+    int32_t  distance_rng_results[RANGING_HOPPING_CHANNELS_MAX];  // Manager side
+    uint32_t raw_rng_results[RANGING_HOPPING_CHANNELS_MAX];       // Manager side
+    int8_t   raw_rssi[RANGING_HOPPING_CHANNELS_MAX];              // Manager side
+    uint8_t  rng_per;                                             // Ranging PER (manager side)
+    float    rng_distance;                                        // Distance measured by ranging (manager side)
+    uint8_t  rng_distance_index;                                  // The index for 'rng_distance'
+    float    pathloss_exponent;                                   // Pathloss exponent value of the median distance
+    int8_t   rssi_value;                                          // Reception RSSI value at manager side
+    int8_t   subordinate_rssi_value;                              // Reception RSSI value at subordinate side
+    int8_t   snr_value;                                           // SNR Value (only for LORA mode type) (manager side)
 } ranging_global_result_t;
 
 /*
@@ -148,8 +149,10 @@ typedef struct
 
 /*!
  * @brief Initialize some parameters for ranging
+ *
+ * @param [in] context  Pointer to the radio context
  */
-void app_radio_ranging_params_init( void );
+void app_radio_ranging_params_init( const void* context );
 
 /*!
  * @brief Setup ranging and configure some parameters
@@ -202,6 +205,13 @@ uint32_t get_ranging_hopping_channels( uint8_t index );
  * @param [in] state  Current state
  */
 void set_ranging_process_state( uint8_t state );
+
+/*!
+ * @brief Check whether the radio is in the ranging process
+ *
+ * @return true: Ranging in running; false: Ranging is not running.
+ */
+bool ranging_process_is_running( void );
 
 #ifdef __cplusplus
 }

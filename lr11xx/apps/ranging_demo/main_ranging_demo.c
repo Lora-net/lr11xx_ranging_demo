@@ -59,15 +59,6 @@
  * --- PRIVATE MACROS-----------------------------------------------------------
  */
 
-#define LORA_RANGING_PROCESS_IRQ_MASK                                                                                  \
-    ( LR11XX_SYSTEM_IRQ_RTTOF_REQ_DISCARDED | LR11XX_SYSTEM_IRQ_RTTOF_RESP_DONE | LR11XX_SYSTEM_IRQ_RTTOF_EXCH_VALID | \
-      LR11XX_SYSTEM_IRQ_RTTOF_TIMEOUT | LR11XX_SYSTEM_IRQ_TX_DONE | LR11XX_SYSTEM_IRQ_RX_DONE |                        \
-      LR11XX_SYSTEM_IRQ_HEADER_ERROR | LR11XX_SYSTEM_IRQ_TIMEOUT | LR11XX_SYSTEM_IRQ_CRC_ERROR )
-
-#if( LORA_PREAMBLE_LENGTH != 12 )
-#error "Please set the preamble length, "LORA_PREAMBLE_LENGTH", as 12, because it is related to the timing of ranging process."
-#endif
-
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE CONSTANTS -------------------------------------------------------
@@ -121,7 +112,7 @@ int main( void )
     apps_common_lr11xx_fetch_and_print_version( ( void* ) context );
     apps_common_lr11xx_print_ranging_configuration( );
 
-    app_radio_ranging_params_init( );
+    app_radio_ranging_params_init( ( void* ) context );
 
 #if defined( RANGING_DISPLAY_FOR_TEST )
     user_button_init( );
@@ -147,10 +138,10 @@ int main( void )
         apps_common_lr11xx_ranging_rx_leds( );
     }
 
-    if( ( LORA_BANDWIDTH == LR11XX_RADIO_LORA_BW_200 ) || ( LORA_BANDWIDTH == LR11XX_RADIO_LORA_BW_400 ) ||
-        ( LORA_BANDWIDTH == LR11XX_RADIO_LORA_BW_800 ) )
+    if( ( LORA_BANDWIDTH != LR11XX_RADIO_LORA_BW_125 ) && ( LORA_BANDWIDTH != LR11XX_RADIO_LORA_BW_250 ) &&
+        ( LORA_BANDWIDTH != LR11XX_RADIO_LORA_BW_500 ) )
     {
-        HAL_PERF_TEST_TRACE_PRINTF( "\r\nERROR: It doesn't support BW200/400/800 for ranging on sub-G or 2.4G.\r\n" );
+        HAL_PERF_TEST_TRACE_PRINTF( "\r\nERROR: Stop to run. This bandwidth is not supported.\r\n" );
         while( 1 )
             ;
     }
@@ -168,8 +159,25 @@ int main( void )
 
         do
         {
+#if defined( RANGING_DISPLAY_FOR_TEST )
+            lcd_button_check( );
+#endif
             app_radio_ranging_setup( ( void* ) context );
-            apps_common_lr11xx_irq_process( ( void* ) context, LORA_RANGING_PROCESS_IRQ_MASK );
+            if( ranging_process_is_running( ) == true )  // Run on the RTToF type
+            {
+                if( is_manager == true )
+                {
+                    apps_common_lr11xx_irq_process( ( void* ) context, RANGING_MANAGER_IRQ_MASK );
+                }
+                else
+                {
+                    apps_common_lr11xx_irq_process( ( void* ) context, RANGING_SUBORDINATE_IRQ_MASK );
+                }
+            }
+            else  // Run on the LoRa type
+            {
+                apps_common_lr11xx_irq_process( ( void* ) context, LORA_IRQ_MASK );
+            }
             demo_status = app_radio_ranging_run( ( void* ) context, is_manager );
         } while( demo_status == APP_STATUS_RUNNING );
 
@@ -234,26 +242,35 @@ void on_rx_crc_error( void )
     HAL_PERF_TEST_TRACE_PRINTF( "ERROR: LoRa CRC error\r\n" );
 }
 
-void on_rttof_request_discarded( void )
+void on_rttof_timeout( void )
 {
-    set_ranging_process_state( APP_RADIO_ERROR );
-    HAL_PERF_TEST_TRACE_PRINTF( "WARN: Ranging request discarded\r\n" );
-}
-
-void on_rttof_response_done( void )
-{
-    set_ranging_process_state( APP_RADIO_RANGING_DONE );
+    /* At manager side */
+    set_ranging_process_state( APP_RADIO_RANGING_TIMEOUT );
 }
 
 void on_rttof_exchange_valid( void )
 {
+    /* At manager side */
     set_ranging_process_state( APP_RADIO_RANGING_DONE );
 }
 
-void on_rttof_timeout( void )
+void on_rttof_request_discarded( void )
 {
+    /* At subordinate side */
+    /* Move on the next channel. Do the same thing with the timeout logic. */
     set_ranging_process_state( APP_RADIO_RANGING_TIMEOUT );
-    HAL_PERF_TEST_TRACE_PRINTF( "WARN: Ranging timeout\r\n" );
+}
+
+void on_rttof_request_valid( void )
+{
+    /* At subordinate side */
+    set_ranging_process_state( APP_RADIO_RANGING_REQ_VALID );
+}
+
+void on_rttof_response_done( void )
+{
+    /* At subordinate side */
+    set_ranging_process_state( APP_RADIO_RANGING_DONE );
 }
 
 /* --- EOF ------------------------------------------------------------------ */

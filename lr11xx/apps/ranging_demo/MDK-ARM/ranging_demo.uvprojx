@@ -1753,14 +1753,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -3585,14 +3590,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -5366,14 +5376,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -7198,14 +7213,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -8877,14 +8897,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -10709,14 +10734,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -12541,14 +12571,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -14253,14 +14288,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -16085,14 +16125,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -17695,14 +17740,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -19527,14 +19577,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -21359,14 +21414,19 @@
               <FilePath>..\ranging_hopping_frequency\app_ranging_result_output.c</FilePath>
             </File>
             <File>
-              <FileName>app_ranging_timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ranging_hopping_frequency\app_ranging_timer.c</FilePath>
-            </File>
-            <File>
               <FileName>app_ranging_lcd_display.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ranging_hopping_frequency\app_ranging_lcd_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pathloss.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_pathloss.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_software_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ranging_hopping_frequency\app_software_timer.c</FilePath>
             </File>
           </Files>
         </Group>

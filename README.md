@@ -27,7 +27,6 @@ The example specific configuration file can be found in [lr11xx/apps/ranging_dem
 
 - Bandwidth shall be chosen among `LR11XX_RADIO_LORA_BW_125`, `LR11XX_RADIO_LORA_BW_250` and `LR11XX_RADIO_LORA_BW_500` for sub-GHz band for the LR1110 and for both the sub-GHz and 2.4GHz ISM bands for the LR1120.
 
-- The preamble length, `LORA_PREAMBLE_LENGTH`, should be set as 12, because it is related to the timing of ranging process.
 
 - Please set the IQ value - `LORA_IQ`, as the standard mode - `LR11XX_RADIO_LORA_IQ_STANDARD`. Because all the calibration values are based on the standard mode. It might reduce the ranging accuracy if used the inverted mode.
 
@@ -119,3 +118,12 @@ This example can be compiled with the following toolchains:
 1. In order to print JSON format for ranging result, the application code needs to be defined the macro `PERF_TEST_ENABLED` (defined by default) to use the `HAL_PERF_TEST_TRACE_PRINTF()` as the print function. At the same time, functions such as `HAL_DBG_TRACE_INFO()`, `HAL_DBG_TRACE_WARNING()`, etc., are useless.
 
 2. You can use a display to show some information when you test. You need to uncomment the macro - `RANGING_DISPLAY_FOR_TEST` in the file - `lr11xx/apps/ranging_demo/main_ranging_demo.h` if you want to. And by using display mode, you can also use the user (blue) button to go into relative range mode. You can get the relative distance based on the location where you push the user button. If you want to come back to normal mode, push the reset (black) button.
+
+3. There is a calculation of pathloss exponent value, which parameter represents the line of sight of the testing environment. This value will be printed as "Gamma" parameter in the JSON file and displayed by using different color texts on the TFT LCD according to the table below. Note that the values with distances less than or equal to 1 meter are not calculated.
+
+|Pathloss Exponent | Channel State | Text Color |
+| --- | --- | --- |
+| γ <= 2.5| Unobstructed | Green |
+| 2.5 < γ <= 4 | Obstructed | Orange |
+| γ > 4 | Heavy Obstruction | Red | 
+

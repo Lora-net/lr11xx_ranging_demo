@@ -73,6 +73,24 @@ extern "C" {
  */
 // #define RANGING_DISPLAY_FOR_TEST 1
 
+/*!
+ * @brief  Related IRQs were enabled on LoRa type.
+ */
+#define LORA_IRQ_MASK                                                                          \
+    ( LR11XX_SYSTEM_IRQ_TX_DONE | LR11XX_SYSTEM_IRQ_RX_DONE | LR11XX_SYSTEM_IRQ_HEADER_ERROR | \
+      LR11XX_SYSTEM_IRQ_TIMEOUT | LR11XX_SYSTEM_IRQ_CRC_ERROR )
+
+/*!
+ * @brief  Related IRQs were enabled on the Ranging manager device.
+ */
+#define RANGING_MANAGER_IRQ_MASK ( LR11XX_SYSTEM_IRQ_RTTOF_EXCH_VALID | LR11XX_SYSTEM_IRQ_RTTOF_TIMEOUT )
+
+/*!
+ * @brief  Related IRQs were enabled on the Ranging subordinate device.
+ */
+#define RANGING_SUBORDINATE_IRQ_MASK \
+    ( LR11XX_SYSTEM_IRQ_RTTOF_REQ_DISCARDED | LR11XX_SYSTEM_IRQ_RTTOF_RESP_DONE | LR11XX_SYSTEM_IRQ_RTTOF_REQ_VALID )
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC CONSTANTS --------------------------------------------------------

@@ -42,6 +42,8 @@
 #include "app_ranging_result_output.h"
 #include "smtc_hal_dbg_trace.h"
 #include "lr11xx_radio_types_str.h"
+#include "app_pathloss.h"
+#include "apps_configuration.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -86,20 +88,20 @@ void app_ranging_radio_settings_output( ranging_params_settings_t* settings )
 void app_ranging_results_output( ranging_global_result_t* result )
 {
     uint32_t freq;
-    int      distance_int;
-    int      distance_deci;
+    float    pathloss_exponent = 0.0;
 
     HAL_PERF_TEST_TRACE_PRINTF( "\"LoRa RSSI\": \"%d dBm\",\r\n", result->rssi_value );
     HAL_PERF_TEST_TRACE_PRINTF( "\"LoRa SNR\": %d,\r\n", result->snr_value );
 
-    if( result->cnt_packet_rx_ok == 0 )
+    if( result->cnt_packet_rx_ok_manager == 0 )
     {
-        HAL_PERF_TEST_TRACE_PRINTF( "\"RngResult\": {\r\n\t\"Num\": %d\r\n\t}\r\n},\r\n", result->cnt_packet_rx_ok );
+        HAL_PERF_TEST_TRACE_PRINTF( "\"RngResult\": {\r\n\t\"Num\": %d\r\n\t}\r\n},\r\n",
+                                    result->cnt_packet_rx_ok_manager );
     }
     else
     {
         HAL_PERF_TEST_TRACE_PRINTF( "\"RngResult\": {\r\n\t\"Num\": %d,\r\n\t\"Results\": [\r\n",
-                                    result->cnt_packet_rx_ok );
+                                    result->cnt_packet_rx_ok_manager );
         for( int i = 0; i < result->rng_result_index; i++ )
         {
             // Get the channel frequency according to index
@@ -109,6 +111,24 @@ void app_ranging_results_output( ranging_global_result_t* result )
             HAL_PERF_TEST_TRACE_PRINTF( "\"Freq\": \"%d.%02d MHz\", ", freq / 1000000, ( freq / 10000 ) % 100 );
             HAL_PERF_TEST_TRACE_PRINTF( "\"RawDistance\": \"0x%08x\", ", result->raw_rng_results[i] );
             HAL_PERF_TEST_TRACE_PRINTF( "\"Distance\": \"%d m\", ", result->distance_rng_results[i] );
+
+            if( result->distance_rng_results[i] <= 1 )
+            {
+                HAL_PERF_TEST_TRACE_PRINTF( "\"Gamma\": \"nan\", " );
+            }
+            else
+            {
+                pathloss_exponent = app_pathloss_exponent_cal( freq, TX_OUTPUT_POWER_DBM, result->raw_rssi[i],
+                                                               result->distance_rng_results[i] );
+                if( pathloss_exponent == 0.0 )
+                {
+                    HAL_PERF_TEST_TRACE_PRINTF( "\"Gamma\": \"nan\", " );
+                }
+                else
+                {
+                    HAL_PERF_TEST_TRACE_PRINTF( "\"Gamma\": \"%.1f\", ", pathloss_exponent );
+                }
+            }
 
             if( i < result->rng_result_index - 1 )
             {
@@ -121,10 +141,27 @@ void app_ranging_results_output( ranging_global_result_t* result )
         }
 
         HAL_PERF_TEST_TRACE_PRINTF( "\t\t],\r\n" );
-        distance_int  = ( int ) ( result->rng_distance );
-        distance_deci = ( int ) ( ( result->rng_distance - distance_int ) * 100 );
-        distance_deci = abs( distance_deci );
-        HAL_PERF_TEST_TRACE_PRINTF( "\t\"DistanceRng\": \"%d.%01d m\",\r\n", distance_int, distance_deci );
+        HAL_PERF_TEST_TRACE_PRINTF( "\t\"DistanceRng\": \"%.1f m\",\r\n", result->rng_distance );
+
+        freq = get_ranging_hopping_channels( result->rng_distance_index );
+        if( result->rng_distance <= 1.0 )
+        {
+            HAL_PERF_TEST_TRACE_PRINTF( "\t\"FinalGamma\": \"nan\",\r\n" );
+            result->pathloss_exponent = 0.0;
+        }
+        else
+        {
+            result->pathloss_exponent = app_pathloss_exponent_cal(
+                freq, TX_OUTPUT_POWER_DBM, result->raw_rssi[result->rng_distance_index], result->rng_distance );
+            if( result->pathloss_exponent == 0.0 )
+            {
+                HAL_PERF_TEST_TRACE_PRINTF( "\t\"FinalGamma\": \"nan\",\r\n" );
+            }
+            else
+            {
+                HAL_PERF_TEST_TRACE_PRINTF( "\t\"FinalGamma\": \"%.1f\",\r\n", result->pathloss_exponent );
+            }
+        }
 
         HAL_PERF_TEST_TRACE_PRINTF( "\t\"PER\": \"%d %%\"\r\n\t}\r\n", result->rng_per );
         HAL_PERF_TEST_TRACE_PRINTF( "},\r\n" );

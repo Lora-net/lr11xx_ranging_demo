@@ -1,10 +1,10 @@
 /**
- * @file      app_ranging_timer.h
+ * @file      app_pathloss.h
  *
- * @brief     Set a simple timer based on system tick
+ * @brief     Calculate the pathloss exponent value.
  *
  * The Clear BSD License
- * Copyright Semtech Corporation 2024. All rights reserved.
+ * Copyright Semtech Corporation 2025. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the disclaimer
@@ -32,8 +32,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef APP_RANGING_TIMER_H
-#define APP_RANGING_TIMER_H
+#ifndef APP_PATHLOSS_H
+#define APP_PATHLOSS_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,8 +43,6 @@ extern "C" {
  * -----------------------------------------------------------------------------
  * --- DEPENDENCIES ------------------------------------------------------------
  */
-#include <stdint.h>
-#include <stdbool.h>
 
 /*
  * -----------------------------------------------------------------------------
@@ -67,39 +65,22 @@ extern "C" {
  */
 
 /*!
- * @brief Initialize a basic timer based on the SysTick. One millisecond( ms ) per tick
- */
-void app_timer_tick_init( void );
-
-/*!
- * @brief Set a timer according to the delay
+ * @brief Calculate the pathloss exponent according to ranging result.
  *
- * @param [out] value Set a value for a timer.
- * @param [in]  duration_ms The duration in ms of the timer.
- */
-void app_timer_tick_set_ms( uint32_t* value, const uint32_t duration_ms );
-
-/*!
- * @brief Get current tick value
+ * @param [in] frequency  The used frequency when ranging.
+ * @param [in] Pt_dBm  The used programmed TX power when ranging. Unit dBm.
+ * @param [in] Pr_dBm  The received RSSI when ranging. Unit dBm.
+ * @param [in] distance  The measured distance from RTToF. Unit m.
  *
- * @returns current value, unit: ms
+ * @returns  Pathloss exponent value. Return 0.0 if the value is abnormal.
  */
-uint32_t app_timer_tick_get_ms( void );
-
-/*!
- * @brief Check if the timer has expired.
- *
- * @param [in] value The distance value.
- *
- * @returns true: Timer has expired
- * @returns false: Timer has not expired yet.
- */
-bool app_timer_tick_has_expired( const uint32_t* value );
+float app_pathloss_exponent_cal( const uint32_t frequency, const int8_t Pt_dBm, const int8_t Pr_dBm,
+                                 const float distance );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // APP_RANGING_TIMER_H
+#endif  // APP_PATHLOSS_H
 
 /* --- EOF ------------------------------------------------------------------ */

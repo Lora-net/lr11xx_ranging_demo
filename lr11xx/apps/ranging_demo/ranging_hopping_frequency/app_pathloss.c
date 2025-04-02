@@ -1,10 +1,10 @@
-/**
- * @file      display_driver.h
+/*!
+ * @file      app_pathloss.c
  *
- * @brief     Display driver
+ * @brief     Calculate the pathloss exponent value.
  *
  * The Clear BSD License
- * Copyright Semtech Corporation 2024. All rights reserved.
+ * Copyright Semtech Corporation 2025. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the disclaimer
@@ -32,85 +32,76 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DISPLAY_DRIVER_H
-#define DISPLAY_DRIVER_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*
  * -----------------------------------------------------------------------------
  * --- DEPENDENCIES ------------------------------------------------------------
  */
 
 #include <stdint.h>
+#include <math.h>
+
+#include "app_pathloss.h"
 
 /*
  * -----------------------------------------------------------------------------
- * --- PUBLIC MACROS -----------------------------------------------------------
- */
-
-/*
- * -----------------------------------------------------------------------------
- * --- PUBLIC CONSTANTS --------------------------------------------------------
- */
-
-#define DISPLAY_WHITE 0xFFFF
-#define DISPLAY_BLACK 0x0000
-#define DISPLAY_BLUE 0x001F
-#define DISPLAY_RED 0xF800
-#define DISPLAY_MAGENTA 0xF81F
-#define DISPLAY_GREEN 0x07E0
-#define DISPLAY_YELLOW 0xFFE0
-#define DISPLAY_BROWN 0XBC40
-#define DISPLAY_GRAY 0X8430
-#define DISPLAY_ORANGE 0XFD20
-
-#define DISPLAY_BACKGROUND DISPLAY_BLACK
-
-/*
- * -----------------------------------------------------------------------------
- * --- PUBLIC TYPES ------------------------------------------------------------
+ * --- PRIVATE MACROS-----------------------------------------------------------
  */
 
 /*
  * -----------------------------------------------------------------------------
- * --- PUBLIC FUNCTIONS PROTOTYPES ---------------------------------------------
+ * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
 
-/*!
- * @brief Initialize the DM-TFT28-105 display
- *
- * @param [in] context Radio implementation parameters
- */
-void display_init( const void* context );
+#define PI 3.14159265
 
-/*!
- * @brief  Display string with format and no fixed parameters
- *
- * @param [in] x Starting x coordinate
- * @param [in] y Starting y coordinate
- * @param [in] color String's color
- * @param [in] format The point to string's format
+/*
+ * -----------------------------------------------------------------------------
+ * --- PRIVATE TYPES -----------------------------------------------------------
  */
-void display_string_printf( uint16_t x, uint16_t y, uint16_t color, const char* format, ... );
 
-/*!
- * @brief Fill the specified section on the display
- *
- * @param [in] x_start Starting x coordinate
- * @param [in] y_start Starting y coordinate
- * @param [in] x_end Ending x coordinate
- * @param [in] y_end Ending y coordinate
- * @param [in] color Fill the color of the section
+/*
+ * -----------------------------------------------------------------------------
+ * --- PRIVATE VARIABLES -------------------------------------------------------
  */
-void display_section_fill( uint16_t x_start, uint16_t y_start, uint16_t x_end, uint16_t y_end, uint16_t color );
 
-#ifdef __cplusplus
+/*
+ * -----------------------------------------------------------------------------
+ * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
+ */
+
+/*
+ * -----------------------------------------------------------------------------
+ * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
+ */
+
+float app_pathloss_exponent_cal( const uint32_t frequency, const int8_t Pt_dBm, const int8_t Pr_dBm,
+                                 const float distance )
+{
+    const uint8_t dr = 1;  // Reference distance in metres, always set to 1
+    float         val;
+
+    if( frequency == 0 )
+    {
+        return 0.0;
+    }
+    // wavelength, metres
+    const float lambda = ( float ) ( 3 * pow( 10, 8 ) / frequency );
+
+    // FSPL at ref distance, dB
+    const float K_dB = 20 * log10f( lambda / ( 4 * PI * dr ) );
+
+    val = log10f( distance / dr );
+    if( val == 0.0 )
+    {
+        return 0.0;
+    }
+
+    return ( ( float ) ( Pr_dBm - Pt_dBm - K_dB ) / ( -10 * val ) );
 }
-#endif
 
-#endif  // DISPLAY_DRIVER_H
+/*
+ * -----------------------------------------------------------------------------
+ * --- PRIVATE FUNCTION DEFINITIONS --------------------------------------------
+ */
 
 /* --- EOF ------------------------------------------------------------------ */

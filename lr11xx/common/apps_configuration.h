@@ -71,7 +71,7 @@ extern "C" {
 #define PA_RAMP_TIME LR11XX_RADIO_RAMP_48_US
 #endif
 #ifndef FALLBACK_MODE
-#define FALLBACK_MODE LR11XX_RADIO_FALLBACK_STDBY_RC
+#define FALLBACK_MODE LR11XX_RADIO_FALLBACK_STDBY_XOSC
 #endif
 #ifndef ENABLE_RX_BOOST_MODE
 #define ENABLE_RX_BOOST_MODE false
@@ -80,7 +80,7 @@ extern "C" {
  * @brief This payload length is used for ranging initiasation for LoRa type
  */
 #ifndef PAYLOAD_LENGTH
-#define PAYLOAD_LENGTH 7
+#define PAYLOAD_LENGTH 6
 #endif
 
 /*!

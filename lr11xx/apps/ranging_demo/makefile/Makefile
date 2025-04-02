@@ -61,8 +61,9 @@ C_SOURCES += \
 ../main_$(APP).c   \
 ../ranging_hopping_frequency/app_ranging_hopping.c \
 ../ranging_hopping_frequency/app_ranging_result_output.c \
-../ranging_hopping_frequency/app_ranging_timer.c \
 ../ranging_hopping_frequency/app_ranging_lcd_display.c \
+../ranging_hopping_frequency/app_software_timer.c \
+../ranging_hopping_frequency/app_pathloss.c \
 
 C_INCLUDES +=  \
 -I../ranging_hopping_frequency/ \
@@ -131,5 +132,45 @@ clean:
 # dependencies
 #######################################
 -include $(wildcard $(BUILD_DIR)/*.d)
+
+# Shell colors
+BOLD_RED := '\033[1;31m'
+BOLD_CYAN := '\033[1;36m'
+BOLD_GREEN := '\033[1;32m'
+BOLD_PURPLE := '\033[1;35m'
+BOLD_YELLOW:= '\033[1;33m'
+YELLOW:= '\033[0;33m'
+IPURPLE:= '\033[0;95m'
+BIPURPLE:= '\033[1;95m'
+
+NC := '\033[0m' # no color
+ECHO = @echo -e $(LIGHT_CYAN)
+ECHO_OK = @echo -e $(LIGHT_GREEN)
+ECHO_CMD = /bin/echo
+
+define echo_help
+	@$(ECHO_CMD) -e $(IPURPLE)'| '$(1)$(NC)
+endef
+
+define echo_help_b
+	@$(ECHO_CMD) -e $(BIPURPLE)'  '$(1)$(NC)
+endef
+
+help:
+	$(call echo_help_b, "----------------------------- Compilation ----------------------------------")
+	$(call echo_help, " * make RADIO_SHIELD=<TARGET>  : build this app on a given EVK target board:(default is LR1110MB1DIS)")
+	$(call echo_help, "")
+	$(call echo_help_b, " * RADIO_SHIELD    PCB         Frequency matching    Characteristics")
+	$(call echo_help, " * LR1110MB1DIS    E516V02B    868/915 MHz           GNSS with LNA for Passive GNSS Antenna")
+	$(call echo_help, " * LR1110MB1DJS    E592V01B    868/915 MHz           GNSS without LNA")
+	$(call echo_help, " * LR1110MB1GIS    E516V02B    490 MHz               GNSS with LNA for Passive GNSS Antenna")
+	$(call echo_help, " * LR1110MB1GJS    E592V01B    490 MHz               GNSS without LNA")
+	$(call echo_help, "")
+	$(call echo_help, " * LR1120MB1DIS    E655V01A    868/915 MHz           GNSS with LNA for Passive GNSS Antenna")
+	$(call echo_help, " * LR1120MB1DJS    E656V01A    868/915 MHz           GNSS without LNA")
+	$(call echo_help, " * LR1120MB1GIS    E655V01A    490 MHz               GNSS with LNA for Passive GNSS Antenna")
+	$(call echo_help, " * LR1120MB1GJS    E656V01A    490 MHz               GNSS without LNA")
+	$(call echo_help_b, "-------------------------------- Clean -------------------------------------")
+	$(call echo_help, " * make clean                  : clean all")
 
 # *** EOF ***

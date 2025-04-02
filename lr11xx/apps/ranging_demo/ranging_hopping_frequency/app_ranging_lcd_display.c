@@ -61,6 +61,21 @@
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
 
+/*!
+ * @brief To save a base distance for relative mode.
+ */
+static float base_ranging_distance;
+
+/*!
+ * @brief To save the last distance.
+ */
+static float last_ranging_distance;
+
+/*!
+ * @brief The flag indicates whether to enter relative mode.
+ */
+static bool relative_mode_flag = false;
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
@@ -73,22 +88,12 @@
 
 void lcd_display_results( ranging_global_result_t* result )
 {
-    static uint16_t ranging_index         = 0;  // To record the times that ranging process has beed done.
-    static float    base_ranging_distance = 0;  // To save a base distance for relative mode.
-    static float    last_ranging_distance = 0;  // To save the last distance.
-    static bool     relative_mode_flag    = false;
+    static uint16_t ranging_index = 0;  // To record the times that ranging process has beed done.
 
     ranging_index++;
 
-    if( true == get_user_button_state( ) )  // Button has been pressed
-    {
-        set_user_button_state( false );  // Clear the pressed state
-        base_ranging_distance = last_ranging_distance;
-        relative_mode_flag    = true;
-    }
-
     display_section_fill( 56, 32, 240, 96, DISPLAY_BACKGROUND );  // Clear the section that are showing values.
-    if( result->cnt_packet_rx_ok != 0 )                           // Get ranging result.
+    if( result->cnt_packet_rx_ok_manager != 0 )                   // Get ranging result.
     {
         if( relative_mode_flag != true )  // Absolute ranging mode
         {
@@ -115,19 +120,44 @@ void lcd_display_results( ranging_global_result_t* result )
     display_section_fill( 168, 96, 240, 112, DISPLAY_BACKGROUND );
     display_string_printf( 0, 96, DISPLAY_WHITE, "Ranging transaction: %d", ranging_index );
 
+    display_section_fill( 152, 112, 240, 128, DISPLAY_BACKGROUND );
+    if( result->pathloss_exponent <= 0.0 )  // The distance may be less than or equal 1.
+    {
+        display_string_printf( 0, 112, DISPLAY_WHITE, "Pathloss exponent: not a num" );
+    }
+    else if( result->pathloss_exponent <= 2.5 )  // Unobstructed
+    {
+        display_string_printf( 0, 112, DISPLAY_GREEN, "Pathloss exponent: %.1f", result->pathloss_exponent );
+    }
+    else if( result->pathloss_exponent <= 4.0 )  // Obstructed
+    {
+        display_string_printf( 0, 112, DISPLAY_ORANGE, "Pathloss exponent: %.1f", result->pathloss_exponent );
+    }
+    else  // Heavy Obstruction
+    {
+        display_string_printf( 0, 112, DISPLAY_RED, "Pathloss exponent: %.1f", result->pathloss_exponent );
+    }
+
     if( relative_mode_flag != true )  // Absolute ranging mode
     {
         display_section_fill( 0, 240, 240, 256, DISPLAY_BACKGROUND );  // Clear "* Relative Range" text.
         display_string_printf( 0, 272, DISPLAY_WHITE, "BLUE button: relative range   " );
         display_string_printf( 0, 288, DISPLAY_WHITE, "BLACK button: reset           " );
     }
-    else  // Relative ranging mode
+    last_ranging_distance = result->rng_distance;
+}
+
+void lcd_button_check( void )
+{
+    if( true == get_user_button_state( ) )  // Button has been pressed
     {
+        set_user_button_state( false );  // Clear the pressed status
+        base_ranging_distance = last_ranging_distance;
+        relative_mode_flag    = true;
         display_string_printf( 0, 240, DISPLAY_BLUE, " * Relative Range" );
         display_string_printf( 0, 272, DISPLAY_WHITE, "BLUE button: update relative  " );
         display_string_printf( 0, 288, DISPLAY_WHITE, "BLACK button: absolute range  " );
     }
-    last_ranging_distance = result->rng_distance;
 }
 
 /*

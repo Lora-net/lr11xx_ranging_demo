@@ -1,10 +1,10 @@
 /*!
- * @file      app_ranging_timer.c
+ * @file      app_software_timer.c
  *
- * @brief     Set a simple timer based on system tick
+ * @brief     Design software timer based on system tick
  *
  * The Clear BSD License
- * Copyright Semtech Corporation 2024. All rights reserved.
+ * Copyright Semtech Corporation 2025. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the disclaimer
@@ -37,7 +37,7 @@
  * --- DEPENDENCIES ------------------------------------------------------------
  */
 
-#include "app_ranging_timer.h"
+#include "app_software_timer.h"
 #include "apps_common.h"
 
 /*
@@ -60,7 +60,7 @@
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
 
-volatile uint32_t system_tick = 0;
+volatile static uint32_t system_ticks = 0;
 
 /*
  * -----------------------------------------------------------------------------
@@ -72,29 +72,65 @@ volatile uint32_t system_tick = 0;
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
  */
 
-void app_timer_tick_init( void )
+void app_system_ticks_init( void )
 {
-    SysTick_Config( SystemCoreClock / 1000 );
+    SysTick_Config( SystemCoreClock / 1000 );  // 1ms for every tick
 }
 
-void app_timer_tick_set_ms( uint32_t* value, const uint32_t duration_ms )
+void app_soft_timer_init( app_soft_timer_t* timer, app_soft_timer_callback callback )
 {
-    *value = system_tick + duration_ms;
+    timer->is_running = false;
+    timer->callback   = callback;
 }
 
-uint32_t app_timer_tick_get_ms( void )
+void app_soft_timer_start( app_soft_timer_t* timer, uint32_t duration_ms, bool is_periodic )
 {
-    return system_tick;
+    timer->duration    = duration_ms;
+    timer->start_time  = system_ticks;
+    timer->is_running  = true;
+    timer->is_periodic = is_periodic;
 }
 
-bool app_timer_tick_has_expired( const uint32_t* value )
+void app_soft_timer_stop( app_soft_timer_t* timer )
 {
-    return system_tick > *value;
+    timer->is_running = false;
+}
+
+bool app_soft_timer_is_expired( app_soft_timer_t* timer )
+{
+    if( timer->is_running )
+    {
+        uint32_t elapsed = system_ticks - timer->start_time;
+        if( elapsed >= timer->duration )
+        {
+            if( timer->callback != NULL )
+            {
+                timer->callback( );
+            }
+            if( timer->is_periodic )
+            {
+                // This is a periodic timer. Need to set the next period.
+                timer->start_time += timer->duration;
+            }
+            else
+            {
+                // This is a single timer. Stop.
+                timer->is_running = false;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+uint32_t app_system_tick_get_ms( void )
+{
+    return system_ticks;
 }
 
 void SysTick_Handler( void )
 {
-    system_tick++;  //+1 ms
+    system_ticks++;  //+1 ms
 }
 
 /*
